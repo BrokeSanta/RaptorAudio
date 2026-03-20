@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>RaptorAudioClass</id>
+    <version>1.0.0</version>
+    <authors>RaptorAudioClass</authors>
+    <description>Package Description</description>
+    <repository type="git" />
+    <dependencies>
+      <group targetFramework="net8.0">
+        <dependency id="NAudio" version="2.3.0" exclude="Build,Analyzers" />
+        <dependency id="NAudio.Sdl2" version="2.2.6" exclude="Build,Analyzers" />
+        <dependency id="NAudio.Sdl2.Library" version="2.30.3" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="C:\setups\RaptorAudioClass\RaptorAudioClass\bin\x64\Release\net8.0\RaptorAudioClass.dll" target="lib\net8.0\RaptorAudioClass.dll" />
+  </files>
+</package>

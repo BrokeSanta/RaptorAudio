@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "dgSpecHash": "QlKNMoC6c/w=",
+  "success": true,
+  "projectFilePath": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\RaptorAudioClass.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.netcore.platforms\\3.1.0\\microsoft.netcore.platforms.3.1.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.win32.registry\\4.7.0\\microsoft.win32.registry.4.7.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio\\2.3.0\\naudio.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.asio\\2.3.0\\naudio.asio.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.core\\2.3.0\\naudio.core.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.midi\\2.3.0\\naudio.midi.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.sdl2\\2.2.6\\naudio.sdl2.2.2.6.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.sdl2.library\\2.30.3\\naudio.sdl2.library.2.30.3.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.wasapi\\2.3.0\\naudio.wasapi.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\naudio.winmm\\2.3.0\\naudio.winmm.2.3.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\system.security.accesscontrol\\4.7.0\\system.security.accesscontrol.4.7.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\system.security.principal.windows\\4.7.0\\system.security.principal.windows.4.7.0.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x86\\8.0.20\\microsoft.netcore.app.runtime.win-x86.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.netcore.app.runtime.linux-x64\\8.0.20\\microsoft.netcore.app.runtime.linux-x64.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x86\\8.0.20\\microsoft.aspnetcore.app.runtime.win-x86.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\8.0.20\\microsoft.netcore.app.host.linux-x64.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.20\\microsoft.aspnetcore.app.runtime.win-x64.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.20\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.20\\microsoft.netcore.app.runtime.win-x64.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x86\\8.0.20\\microsoft.windowsdesktop.app.runtime.win-x86.8.0.20.nupkg.sha512",
+    "C:\\Users\\efe1g\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.linux-x64\\8.0.20\\microsoft.aspnetcore.app.runtime.linux-x64.8.0.20.nupkg.sha512"
+  ],
+  "logs": []
+}
