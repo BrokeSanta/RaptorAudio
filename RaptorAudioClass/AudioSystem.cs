@@ -14,641 +14,6 @@ using System.Threading.Tasks;
 
 namespace RaptorAudio
 {
-    public unsafe class NativeMp3Reader : WaveStream, ISampleProvider
-    {
-        private IntPtr handle;
-        private readonly WaveFormat waveFormat;
-        private readonly long totalSamples;
-        private readonly int channels;
-        private readonly int sampleRate;
-        private long currentSample;
-        private bool disposed;
-        private NativeBuffer? ownedBuffer; // track buffer we need to free
-        public NativeMp3Reader(NativeBuffer buffer) : this(buffer, false) { }
-        private NativeMp3Reader(NativeBuffer buffer, bool ownsBuffer)
-        {
-            if (ownsBuffer)
-                ownedBuffer = buffer;
-
-            handle = NativeMp3.mp3_open_memory(buffer.Pointer, buffer.Length);
-            if (handle == IntPtr.Zero)
-            {
-                if (ownsBuffer)
-                {
-                    buffer.Dispose();
-                    ownedBuffer = null;
-                }
-                throw new InvalidDataException("Failed to open MP3 data");
-            }
-
-            channels = NativeMp3.mp3_get_channels(handle);
-            sampleRate = NativeMp3.mp3_get_sample_rate(handle);
-            totalSamples = NativeMp3.mp3_get_total_samples(handle);
-            waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
-        }
-        public NativeMp3Reader(string path) : this(LoadFile(path), ownsBuffer: true) { }
-        public override WaveFormat WaveFormat => waveFormat;
-        public override long Length => totalSamples * sizeof(float);
-        public override long Position
-        {
-            get => currentSample * sizeof(float);
-            set
-            {
-                long sample = value / sizeof(float);
-                NativeMp3.mp3_seek_sample(handle, sample);
-                currentSample = sample;
-            }
-        }
-        public override TimeSpan TotalTime => TimeSpan.FromSeconds((double)totalSamples / channels / sampleRate);
-        public override TimeSpan CurrentTime
-        {
-            get => TimeSpan.FromSeconds((double)currentSample / channels / sampleRate);
-            set => Position = (long)(value.TotalSeconds * sampleRate * channels) * sizeof(float);
-        }
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            if (disposed || handle == IntPtr.Zero) return 0;
-
-            int floatsRequested = count / sizeof(float);
-
-            fixed (byte* bptr = &buffer[offset])
-            {
-                float* fptr = (float*)bptr;
-                int read = NativeMp3.mp3_read_float(handle, fptr, floatsRequested);
-                currentSample += read;
-                return read * sizeof(float);
-            }
-        }
-        public int Read(float[] buffer, int offset, int count)
-        {
-            if (disposed || handle == IntPtr.Zero) return 0;
-
-            fixed (float* fptr = &buffer[offset])
-            {
-                int read = NativeMp3.mp3_read_float(handle, fptr, count);
-                currentSample += read;
-                return read;
-            }
-        }
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposed)
-            {
-                disposed = true;
-                if (handle != IntPtr.Zero)
-                {
-                    NativeMp3.mp3_close(handle);
-                    handle = IntPtr.Zero;
-                }
-                // Free the native buffer if we own it
-                if (ownedBuffer.HasValue)
-                {
-                    var buf = ownedBuffer.Value;
-                    buf.Dispose();
-                    ownedBuffer = null;
-                }
-            }
-            base.Dispose(disposing);
-        }
-        private static NativeBuffer LoadFile(string path)
-        {
-            byte[] data = File.ReadAllBytes(path);
-            var buf = new NativeBuffer(data.Length);
-            fixed (byte* src = data)
-                Buffer.MemoryCopy(src, buf.Pointer, buf.Length, data.Length);
-            return buf;
-        }
-    }
-    public unsafe class NativeVorbisReader : WaveStream, ISampleProvider
-    {
-        private IntPtr handle;
-        private readonly WaveFormat waveFormat;
-        private readonly long totalSamples; // in per-channel samples
-        private readonly int channels;
-        private readonly int sampleRate;
-        private long currentSample;
-        private bool disposed;
-        private NativeBuffer? ownedBuffer; // track buffer we need to free
-
-        /// <summary>
-        /// Opens an OGG/Vorbis from a NativeBuffer (caller manages the buffer's lifetime).
-        /// </summary>
-        public NativeVorbisReader(NativeBuffer buffer) : this(buffer, false) { }
-
-        private NativeVorbisReader(NativeBuffer buffer, bool ownsBuffer)
-        {
-            if (ownsBuffer)
-                ownedBuffer = buffer;
-
-            handle = NativeVorbis.vorbis_open_memory(buffer.Pointer, buffer.Length);
-            if (handle == IntPtr.Zero)
-            {
-                if (ownsBuffer)
-                {
-                    buffer.Dispose();
-                    ownedBuffer = null;
-                }
-                throw new InvalidDataException("Failed to open Vorbis data");
-            }
-
-            channels = NativeVorbis.vorbis_get_channels(handle);
-            sampleRate = NativeVorbis.vorbis_get_sample_rate(handle);
-            totalSamples = NativeVorbis.vorbis_get_total_samples(handle);
-            waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
-        }
-
-        /// <summary>
-        /// Opens an OGG/Vorbis from a file path (loads entirely into memory, owns the buffer).
-        /// </summary>
-        public NativeVorbisReader(string path) : this(LoadFile(path), ownsBuffer: true) { }
-
-        public override WaveFormat WaveFormat => waveFormat;
-
-        public override long Length => (long)totalSamples * channels * sizeof(float);
-
-        public override long Position
-        {
-            get => currentSample * channels * sizeof(float);
-            set
-            {
-                long sample = value / (channels * sizeof(float));
-                NativeVorbis.vorbis_seek_sample(handle, sample);
-                currentSample = sample;
-            }
-        }
-
-        public override TimeSpan TotalTime =>
-            TimeSpan.FromSeconds((double)totalSamples / sampleRate);
-
-        public override TimeSpan CurrentTime
-        {
-            get => TimeSpan.FromSeconds((double)currentSample / sampleRate);
-            set => Position = (long)(value.TotalSeconds * sampleRate) * channels * sizeof(float);
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            if (disposed || handle == IntPtr.Zero) return 0;
-
-            int floatsRequested = count / sizeof(float);
-            int samplesRequested = floatsRequested / channels;
-
-            fixed (byte* bptr = &buffer[offset])
-            {
-                float* fptr = (float*)bptr;
-                // vorbis_read_float returns samples (not floats)
-                int samplesRead = NativeVorbis.vorbis_read_float(handle, fptr, samplesRequested);
-                currentSample += samplesRead;
-                return samplesRead * channels * sizeof(float);
-            }
-        }
-        public int Read(float[] buffer, int offset, int count)
-        {
-            if (disposed || handle == IntPtr.Zero) return 0;
-
-            int samplesRequested = count / channels;
-
-            fixed (float* fptr = &buffer[offset])
-            {
-                int samplesRead = NativeVorbis.vorbis_read_float(handle, fptr, samplesRequested);
-                currentSample += samplesRead;
-                return samplesRead * channels;
-            }
-        }
-
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposed)
-            {
-                disposed = true;
-                if (handle != IntPtr.Zero)
-                {
-                    NativeVorbis.vorbis_close(handle);
-                    handle = IntPtr.Zero;
-                }
-                // Free the native buffer if we own it
-                if (ownedBuffer.HasValue)
-                {
-                    var buf = ownedBuffer.Value;
-                    buf.Dispose();
-                    ownedBuffer = null;
-                }
-            }
-            base.Dispose(disposing);
-        }
-
-        private static NativeBuffer LoadFile(string path)
-        {
-            byte[] data = File.ReadAllBytes(path);
-            var buf = new NativeBuffer(data.Length);
-            fixed (byte* src = data)
-                Buffer.MemoryCopy(src, buf.Pointer, buf.Length, data.Length);
-            return buf;
-        }
-    }
-
-    public unsafe class NativeMixer : ISampleProvider, IDisposable
-    {
-        private readonly List<ISampleProvider> sources;
-        private const int MaxInputs = 1024;
-
-        private float[] sourceBuffer;
-        private GCHandle pinnedHandle;
-        private float* sourcePtr;
-        private int sourceBufferLen;
-        private bool disposed;
-        public WaveFormat WaveFormat { get; private set; }
-        public bool ReadFully { get; set; }
-        public IEnumerable<ISampleProvider> MixerInputs => sources;
-        public NativeMixer(WaveFormat waveFormat)
-        {
-            if (waveFormat.Encoding != WaveFormatEncoding.IeeeFloat)
-                throw new ArgumentException("Mixer wave format must be IEEE float");
-
-            sources = new List<ISampleProvider>();
-            WaveFormat = waveFormat;
-        }
-        private void EnsureBuffer(int count)
-        {
-            if (sourceBufferLen >= count) return;
-
-            // Free old pinned buffer if it exists
-            if (pinnedHandle.IsAllocated)
-                pinnedHandle.Free();
-
-            // GC.AllocateArray with pinned:true gives us an array the GC will never relocate.
-            // This means sourcePtr stays valid forever without needing fixed blocks.
-            sourceBuffer = GC.AllocateArray<float>(count, pinned: true);
-            pinnedHandle = GCHandle.Alloc(sourceBuffer, GCHandleType.Pinned);
-            sourcePtr = (float*)pinnedHandle.AddrOfPinnedObject();
-            sourceBufferLen = count;
-        }
-
-
-        public NativeMixer(IEnumerable<ISampleProvider> sources)
-        {
-            this.sources = new List<ISampleProvider>();
-            foreach (var source in sources)
-            {
-                AddMixerInput(source);
-            }
-            if (this.sources.Count == 0)
-            {
-                throw new ArgumentException("Must provide at least one input in this constructor");
-            }
-        }
-
-
-        [System.Runtime.CompilerServices.SkipLocalsInit]
-        public int Read(float[] buffer, int offset, int count)
-        {
-            if (disposed) return 0;
-            int outputSamples = 0;
-            EnsureBuffer(count);
-            fixed (float* dst = &buffer[offset])
-            {
-                NativeMemory.Clear(dst, (nuint)(count * sizeof(float)));
-                lock (sources)
-                {
-                    for (int i = sources.Count - 1; i >= 0; i--)
-                    {
-                        NativeMemory.Clear(sourcePtr, (nuint)(count * sizeof(float)));
-                        int read = sources[i].Read(sourceBuffer, 0, count);
-
-                        if (read == 0)
-                        {
-                            sources.RemoveAt(i);
-                            continue;
-                        }
-
-                        // SIMD-accelerated sum
-                        SumBuffers(dst, sourcePtr, read);
-
-                        outputSamples = Math.Max(outputSamples, read);
-                    }
-                }
-            }
-            if (ReadFully && outputSamples < count)
-                outputSamples = count;
-
-            return outputSamples;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void SumBuffers(float* dst, float* src, int count)
-        {
-            int n = 0;
-            int vectorSize = Vector<float>.Count; // 4 (SSE), 8 (AVX2), or 4 (NEON)
-
-            // SIMD bulk: process vectorSize floats per iteration
-            int limit = count - (count % vectorSize);
-            for (; n < limit; n += vectorSize)
-            {
-                // Load vectorSize floats from each buffer into SIMD registers,
-                // add them, and write back — all in ~1 clock cycle.
-                var output = *(Vector<float>*)(dst + n);
-                var input = *(Vector<float>*)(src + n);
-                *(Vector<float>*)(dst + n) = output + input;
-            }
-
-            // Scalar tail: handle remaining samples that don't fill a full vector
-            for (; n < count; n++)
-            {
-                dst[n] += src[n];
-            }
-        }
-        public void AddMixerInput(ISampleProvider mixerInput)
-        {
-            lock (sources)
-            {
-                if (sources.Count >= MaxInputs)
-                    throw new InvalidOperationException("Too many mixer inputs");
-                sources.Add(mixerInput);
-            }
-
-            if (WaveFormat == null)
-            {
-                WaveFormat = mixerInput.WaveFormat;
-            }
-            else if (WaveFormat.SampleRate != mixerInput.WaveFormat.SampleRate ||
-                     WaveFormat.Channels != mixerInput.WaveFormat.Channels)
-            {
-                throw new ArgumentException("All mixer inputs must have the same WaveFormat");
-            }
-        }
-
-        public void RemoveMixerInput(ISampleProvider mixerInput)
-        {
-            lock (sources)
-            {
-                sources.Remove(mixerInput);
-            }
-        }
-        public void Dispose()
-        {
-            if (disposed) return;
-            disposed = true;
-
-            lock (sources)
-            {
-                sources.Clear();
-            }
-
-            if (pinnedHandle.IsAllocated)
-                pinnedHandle.Free();
-
-            sourceBuffer = null;
-            sourcePtr = null;
-            sourceBufferLen = 0;
-        }
-    }
-    public class CorruptionSampleProvider : ISampleProvider
-    {
-        private readonly ISampleProvider source;
-        private float lastSampleL;
-        private float lastSampleR;
-        private int sampleCounter;
-        private float filterL;
-        private float filterR;
-        private float tremoloPhase;
-
-        public WaveFormat WaveFormat => source.WaveFormat;
-
-        public int Distortion { get; set; } = 0;
-        public int Bitcrush { get; set; } = 0;
-        public int SampleCrush { get; set; } = 0;
-        public int Filter { get; set; } = 0;
-        public int Tremolo { get; set; } = 0;
-
-        public CorruptionSampleProvider(ISampleProvider source)
-        {
-            this.source = source;
-        }
-
-        public int Read(float[] buffer, int offset, int count)
-        {
-            int read = source.Read(buffer, offset, count);
-
-            int distortion = Distortion;
-            int bitcrush = Bitcrush;
-            int sampleCrush = SampleCrush;
-            int filter = Filter;
-            int tremolo = Tremolo;
-
-            if (distortion <= 0 && bitcrush <= 0 && sampleCrush <= 0
-                && filter <= 0 && tremolo <= 0)
-                return read;
-
-            float dMix = distortion / 100f;
-            float bMix = bitcrush / 100f;
-            float sMix = sampleCrush / 100f;
-            float fMix = filter / 100f;
-            float tMix = tremolo / 100f;
-
-            float drive = 10f;
-            float crushLevels = 6f;
-            int crushRate = 6;
-            float cutoff = 0.05f;
-            float tremoloDepth = 0.8f;
-            float tremoloRate = 14f;
-            float phaseInc = tremoloRate / WaveFormat.SampleRate * 2f;
-
-            for (int i = 0; i < read; i += 2)
-            {
-                float left = buffer[offset + i];
-                float right = buffer[offset + i + 1];
-
-                float corruptedL = left;
-                float corruptedR = right;
-
-                if (distortion > 0)
-                {
-                    float distL = MathF.Tanh(corruptedL * (1f + drive));
-                    float distR = MathF.Tanh(corruptedR * (1f + drive));
-                    corruptedL = corruptedL * (1f - dMix) + distL * dMix;
-                    corruptedR = corruptedR * (1f - dMix) + distR * dMix;
-                }
-
-                if (bitcrush > 0)
-                {
-                    float crushedL = MathF.Round(corruptedL * crushLevels) / crushLevels;
-                    float crushedR = MathF.Round(corruptedR * crushLevels) / crushLevels;
-                    corruptedL = corruptedL * (1f - bMix) + crushedL * bMix;
-                    corruptedR = corruptedR * (1f - bMix) + crushedR * bMix;
-                }
-
-                if (sampleCrush > 0)
-                {
-                    float crushL, crushR;
-                    if (sampleCounter % crushRate != 0)
-                    {
-                        crushL = lastSampleL;
-                        crushR = lastSampleR;
-                    }
-                    else
-                    {
-                        crushL = corruptedL;
-                        crushR = corruptedR;
-                        lastSampleL = corruptedL;
-                        lastSampleR = corruptedR;
-                    }
-                    corruptedL = corruptedL * (1f - sMix) + crushL * sMix;
-                    corruptedR = corruptedR * (1f - sMix) + crushR * sMix;
-                    sampleCounter++;
-                }
-
-                if (filter > 0)
-                {
-                    filterL += cutoff * (corruptedL - filterL);
-                    filterR += cutoff * (corruptedR - filterR);
-                    corruptedL = corruptedL * (1f - fMix) + filterL * fMix;
-                    corruptedR = corruptedR * (1f - fMix) + filterR * fMix;
-                }
-
-                if (tremolo > 0)
-                {
-                    float trem = 1f - (tremoloDepth * (0.5f + 0.5f * MathF.Sin(tremoloPhase * MathF.PI)));
-                    float tremL = corruptedL * trem;
-                    float tremR = corruptedR * trem;
-                    corruptedL = corruptedL * (1f - tMix) + tremL * tMix;
-                    corruptedR = corruptedR * (1f - tMix) + tremR * tMix;
-                    tremoloPhase += phaseInc;
-                    if (tremoloPhase > 2f) tremoloPhase -= 2f;
-                }
-
-                buffer[offset + i] = corruptedL;
-                buffer[offset + i + 1] = corruptedR;
-            }
-
-            return read;
-        }
-    }
-    public class AutoDisposeSampleProvider : ISampleProvider, IDisposable
-    {
-        private readonly ISampleProvider sampleSource;
-        private readonly WaveStream waveStream;
-        private readonly bool looping;
-        private bool disposed;
-        private bool finished;
-        public event Action Finished;
-
-        public WaveFormat WaveFormat => sampleSource.WaveFormat;
-
-        public AutoDisposeSampleProvider(ISampleProvider source, WaveStream stream, bool looping)
-        {
-            this.sampleSource = source;
-            this.waveStream = stream;
-            this.looping = looping;
-        }
-        [System.Runtime.CompilerServices.SkipLocalsInit]
-        public int Read(float[] buffer, int offset, int count)
-        {
-            if (disposed || finished) return 0;
-
-            int total = 0;
-            while (total < count)
-            {
-                int read = sampleSource.Read(buffer, offset + total, count - total);
-                if (read == 0)
-                {
-                    if (looping)
-                    {
-                        waveStream.Position = 0;
-                        continue;
-                    }
-                    else
-                    {
-                        finished = true;
-                        // Fire the event off the audio thread to avoid deadlocks.
-                        var handler = Finished;
-                        if (handler != null)
-                        {
-                            Task.Run(() => handler.Invoke());
-                        }
-                        return total;
-                    }
-                }
-                total += read;
-            }
-            return total;
-        }
-
-        public void Dispose()
-        {
-            if (!disposed)
-            {
-                disposed = true;
-                Finished = null;
-                waveStream?.Dispose();
-            }
-        }
-    }
-    public unsafe struct NativeBuffer : IDisposable
-    {
-        public byte* Pointer;
-        public int Length;
-        public NativeBuffer(int length)
-        {
-            Pointer = (byte*)NativeMemory.Alloc((nuint)length);
-            Length = length;
-        }
-        public readonly byte[] ToManagedArray()
-        {
-            if (Pointer == null)
-                throw new ObjectDisposedException(nameof(NativeBuffer));
-            byte[] managed = new byte[Length];
-            fixed (byte* dst = managed)
-            {
-                Buffer.MemoryCopy(Pointer, dst, Length, Length);
-            }
-            return managed;
-        }
-        public void Dispose()
-        {
-            if (Pointer != null)
-            {
-                NativeMemory.Free(Pointer);
-                Pointer = null;
-                Length = 0;
-            }
-        }
-    }
-    internal static class AudioPlatform
-    {
-        public static bool IsWindows => RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
-        public static IWavePlayer CreateOutput()
-        {
-            if (IsWindows)
-            {
-                return new WasapiOut(AudioClientShareMode.Shared, 40);
-            }
-            else
-            {
-                return new NAudio.Sdl2.WaveOutSdl();
-            }
-        }
-        public static WaveStream CreateReader(string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext switch
-            {
-                ".mp3" => new NativeMp3Reader(path),
-                ".ogg" => new NativeVorbisReader(path),
-                ".wav" => new WaveFileReader(path),
-                _ => throw new NotSupportedException($"Audio format not supported: {ext}")
-            };
-        }
-        public static unsafe WaveStream CreateReader(NativeBuffer buffer, string path)
-        {
-            string ext = Path.GetExtension(path).ToLowerInvariant();
-            return ext switch
-            {
-                ".mp3" => new NativeMp3Reader(buffer),
-                ".ogg" => new NativeVorbisReader(buffer),
-                ".wav" => new WaveFileReader(new UnmanagedMemoryStream(buffer.Pointer, buffer.Length)),
-                _ => throw new NotSupportedException($"Not supported: {ext}")
-            };
-        }
-    }
     internal class AudioInstance : IDisposable
     {
         public string name { get; }
@@ -662,6 +27,7 @@ namespace RaptorAudio
         private Stream owningStream;
         private bool disposed = false;
         public bool isPlaying { get; set; } = false;
+        public float BaseVolume { get; internal set; }
 
         public AudioInstance(string name, string path, NativeBuffer? cached, int volume, bool looping)
         {
@@ -684,6 +50,7 @@ namespace RaptorAudio
             var resampled = new WdlResamplingSampleProvider(sampleprovider, 48000);
             var stereo = resampled.WaveFormat.Channels == 1 ? resampled.ToStereo() : resampled;
             isample = new VolumeSampleProvider(stereo) { Volume = Math.Clamp(volume / 100f, 0f, 1f) };
+            BaseVolume = isample.Volume;
         }
 
         // Convenience overload for non-cached usage
@@ -715,6 +82,9 @@ namespace RaptorAudio
         private Dictionary<string, AudioInstance> audiolist;
         private Dictionary<string, Action> activehandlers;
         private Dictionary<string, NativeBuffer> audioCache;
+        private readonly Dictionary<string, Collectionaire> buses;
+        private readonly Dictionary<string, Queue<AudioInstance>> pools;
+        private readonly Dictionary<string, int> poolsizes;
         private IWavePlayer player;
         private NativeMixer mixer;
         private CorruptionSampleProvider CorruptionControl;
@@ -726,6 +96,9 @@ namespace RaptorAudio
             audiolist = new Dictionary<string, AudioInstance>(StringComparer.Ordinal);
             activehandlers = new();
             audioCache = new Dictionary<string, NativeBuffer>(StringComparer.OrdinalIgnoreCase);
+            buses = new(StringComparer.Ordinal);
+            pools = new(StringComparer.Ordinal);
+            poolsizes = new(StringComparer.Ordinal);
             disposed = false;
             player = AudioPlatform.CreateOutput();
 
@@ -742,7 +115,160 @@ namespace RaptorAudio
         {
             return Math.Clamp(volume / 100f, 0f, 1f);
         }
+        public void CreatePool(string name, int howmuch)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Name cannot be empty", nameof(name));
+            lock (audiolock)
+            {
+                if (disposed)
+                    throw new ObjectDisposedException(nameof(AudioSystem));
+                if (pools.ContainsKey(name))
+                    return;
+                if (!audiolist.TryGetValue(name, out var template))
+                    throw new KeyNotFoundException($"Sound '{name}' not found");
+                var queue = new Queue<AudioInstance>(howmuch);
+                var templatecollectionaires = buses.Values.Where(item => item.instances.Contains(template)).ToList();
+                for (int i = 0; i < howmuch; i++)
+                {
+                    var clone = CloneInstanceInternal(template);
+                    if (clone == null)
+                        continue;
+                    foreach (var bus in templatecollectionaires)
+                    {
+                        bus.instances.Add(clone);
+                    }
+                    queue.Enqueue(clone);
+                }
+                pools[name] = queue;
+                poolsizes[name] = howmuch;
+            }
+        }
+        private AudioInstance CloneInstanceInternal(AudioInstance template)
+        {
+            try
+            {
+                NativeBuffer? cached = null;
+                if (audioCache.TryGetValue(template.path, out var buffer))
+                    cached = buffer;
 
+                var clone = new AudioInstance(
+                    template.name,
+                    template.path,
+                    cached,                          // ← Important
+                    (int)(template.BaseVolume * 100),
+                    template.looping
+                );
+
+                clone.BaseVolume = template.BaseVolume;
+                return clone;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to clone '{template.name}': {ex.Message}");
+                return null;
+            }
+        }
+        private Task PlayPooledInstance(AudioInstance instance,string orginalname, Queue<AudioInstance> pool)
+        {
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Action finished = null;
+            finished = () =>
+            {
+                if (instance.eventiful != null)
+                    instance.eventiful.Finished -= finished;
+
+                lock (audiolock)
+                {
+                    try { mixer.RemoveMixerInput(instance.isample); } catch { }
+
+                    instance.reader.Position = 0;
+                    instance.isPlaying = false;
+
+                    pool.Enqueue(instance); // Put back in pool
+                }
+
+                tcs.TrySetResult(true);
+            };
+            instance.eventiful.Finished += finished;
+            lock (audiolock)
+            {
+                try
+                {
+                    instance.reader.Position = 0;
+                    instance.isPlaying = true;
+                    mixer.AddMixerInput(instance.isample);
+                }
+                catch
+                {
+                    instance.reader.Position = 0;
+                    instance.isPlaying = false;
+                    pool.Enqueue(instance);
+                    tcs.TrySetResult(false);
+                }
+            }
+            return tcs.Task;
+        }
+        public Task PlayPooled(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Name cannot be empty", nameof(name));
+
+            lock (audiolock)
+            {
+                if (pools.TryGetValue(name, out var queue) && queue.Count > 0)
+                {
+                    var instance = queue.Dequeue();
+                    return PlayPooledInstance(instance, name, queue);
+                }
+            }
+
+            // If pool is empty or doesn't exist, use normal method
+            return PlayAndForget(name);
+        }
+        public void RemovePool(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+            lock (audiolock)
+            {
+                if (disposed)
+                    throw new ObjectDisposedException(nameof(AudioSystem));
+                if (!pools.TryGetValue(name, out var queue))
+                    return;
+                while (queue.Count > 0)
+                {
+                    var instance = queue.Dequeue();
+                    if (instance == null) continue;
+                    foreach (var bus in buses.Values)
+                    {
+                        bus.instances.Remove(instance);
+                    }
+                    try
+                    {
+                        mixer.RemoveMixerInput(instance.isample);
+                    }
+                    catch { }
+                    instance.Dispose();
+                }
+                pools.Remove(name);
+                poolsizes.Remove(name);
+            }
+        }
+        public void ClearAllPools()
+        {
+            lock (audiolock)
+            {
+                if (disposed) return;
+
+                var poolNames = pools.Keys.ToList();
+
+                foreach (string name in poolNames)
+                {
+                    RemovePool(name);
+                }
+            }
+        }
         public void Cache(string path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -920,8 +446,80 @@ namespace RaptorAudio
 
                 if (!audiolist.TryGetValue(name, out var instance))
                     throw new KeyNotFoundException($"Audio instance '{name}' not found");
+                float newVol = AudioScaling(volume);
+                instance.isample.Volume = newVol;
+                instance.BaseVolume = newVol;
+            }
+        }
+        public void CreateCollectionaire(string name)
+        {
+            lock (audiolock)
+            {
+                if (disposed) throw new ObjectDisposedException(nameof(AudioSystem));
 
-                instance.isample.Volume = AudioScaling(volume);
+                if (buses.ContainsKey(name))
+                    return;
+                var collectionaire = new Collectionaire(name);
+                buses.Add(name, collectionaire);
+            }
+        }
+        public void AddToCollectionaire(string audio, string collectionaire)
+        {
+            lock (audiolock)
+            {
+                if (disposed)
+                    throw new ObjectDisposedException(nameof(AudioSystem));
+                if (!buses.TryGetValue(collectionaire, out var bus))
+                    throw new KeyNotFoundException($"Collectionaire '{collectionaire}' not found");
+                if (!audiolist.TryGetValue(audio, out var instance))
+                    throw new KeyNotFoundException($"Audio '{audio}' not found");
+                if (!bus.instances.Contains(instance))
+                    bus.instances.Add(instance);
+            }
+        }
+        public void ChangeCollectionaireVolume(string collectionaire, float volume)
+        {
+            lock (audiolock)
+            {
+                if (disposed)
+                    throw new ObjectDisposedException(nameof(AudioSystem));
+                if (!buses.TryGetValue(collectionaire, out var bus))
+                    throw new KeyNotFoundException($"Bus '{collectionaire}' not found");
+                bus.Volume = volume;
+                ApplyBusVolume(bus);
+            }
+        }
+        private void ApplyBusVolume(Collectionaire collectionaire)
+        {
+            float vol = collectionaire.Volume;
+            var span = CollectionsMarshal.AsSpan(collectionaire.instances);
+
+            for (int i = 0; i < span.Length; i++)
+            {
+                var inst = span[i];
+                if (inst?.isample != null)
+                    inst.isample.Volume = inst.BaseVolume * vol;
+            }
+        }
+        public void RemoveFromCollectionaire(string audio, string collectionaire)
+        {
+            lock (audiolock)
+            {
+                if (disposed)
+                    throw new ObjectDisposedException(nameof(AudioSystem));
+                if (!buses.TryGetValue(collectionaire, out var bus))
+                    throw new KeyNotFoundException($"Collectionaire '{collectionaire}' not found");
+                if (!audiolist.TryGetValue(audio, out var instance))
+                    throw new KeyNotFoundException($"Audio '{audio}' not found");
+                bus.instances.Remove(instance);
+            }
+        }
+        public void ClearCollectionaire(string collectionaire)
+        {
+            lock (audiolock)
+            {
+                if (buses.TryGetValue(collectionaire, out var bus))
+                    bus.instances.Clear();
             }
         }
         public TimeSpan GetPosition(string name)
@@ -1069,9 +667,13 @@ namespace RaptorAudio
         {
             if (!audiolist.TryGetValue(name, out var oldInstance))
                 return;
-
+            foreach (var bus in buses.Values)
+            {
+                bus.instances.Remove(oldInstance);
+            }
             try
             {
+
                 if (activehandlers.TryGetValue(name, out var handler))
                 {
                     oldInstance.eventiful.Finished -= handler;
@@ -1096,30 +698,38 @@ namespace RaptorAudio
                 Console.WriteLine($"Error deleting audio instance '{name}': {ex.Message}");
             }
         }
-
         public Task PlayAndForget(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Name cannot be null or empty", nameof(name));
+
             string path;
             int volume;
             bool looping;
             NativeBuffer? cached = null;
+            List<Collectionaire> busesToJoin = null;   // ← New
+
             lock (audiolock)
             {
                 if (disposed)
                     throw new ObjectDisposedException(nameof(AudioSystem));
+
                 if (!audiolist.TryGetValue(name, out var template))
                     throw new KeyNotFoundException($"Audio instance '{name}' not found");
+
                 path = template.path;
                 volume = (int)(template.isample.Volume * 100);
                 looping = template.looping;
 
                 if (audioCache.TryGetValue(path, out var nativeBuffer))
-                {
                     cached = nativeBuffer;
-                }
+
+                // Collect all buses that the original belongs to
+                busesToJoin = buses.Values
+                    .Where(bus => bus.instances.Contains(template))
+                    .ToList();
             }
+
             AudioInstance clone;
             try
             {
@@ -1130,7 +740,9 @@ namespace RaptorAudio
                 Console.WriteLine($"Error creating audio clone for '{name}': {ex.Message}");
                 throw;
             }
+
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
             Action finishedhandler = null;
             finishedhandler = () =>
             {
@@ -1166,6 +778,16 @@ namespace RaptorAudio
                     throw new ObjectDisposedException(nameof(AudioSystem));
                 }
 
+                // Add clone to the same buses as the original
+                if (busesToJoin != null && busesToJoin.Count > 0)
+                {
+                    foreach (var bus in busesToJoin)
+                    {
+                        if (!bus.instances.Contains(clone))
+                            bus.instances.Add(clone);
+                    }
+                }
+
                 try
                 {
                     mixer.AddMixerInput(clone.isample);
@@ -1181,7 +803,6 @@ namespace RaptorAudio
 
             return tcs.Task;
         }
-
         public void Dispose()
         {
             lock (audiolock)
@@ -1190,7 +811,11 @@ namespace RaptorAudio
                     return;
 
                 disposed = true;
-
+                foreach (var bus in buses.Values)
+                {
+                    bus.instances.Clear();
+                }
+                buses.Clear();
                 try
                 {
                     player?.Stop();
@@ -1238,6 +863,15 @@ namespace RaptorAudio
                 {
                     Console.WriteLine($"Error disposing output: {ex.Message}");
                 }
+                foreach (var queue in pools.Values)
+                {
+                    while (queue.Count > 0)
+                    {
+                        queue.Dequeue()?.Dispose();
+                    }
+                }
+                pools.Clear();
+                poolsizes.Clear();
                 mixer?.Dispose();
             }
         }

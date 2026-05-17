@@ -1,20 +1,7 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\setups\\RaptorAudioClass\\",
-  "Documents": [
-    {
-      "AbsoluteMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|C:\\setups\\RaptorAudioClass\\raptoraudioclass\\raptoraudioclass.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|solutionrelative:raptoraudioclass\\raptoraudioclass.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|c:\\setups\\raptoraudioclass\\raptoraudioclass\\nativedecoders.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|solutionrelative:raptoraudioclass\\nativedecoders.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|c:\\setups\\raptoraudioclass\\raptoraudioclass\\audiosystem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{3A36630E-91A3-425E-9FC7-5CB6D6B0A609}|RaptorAudioClass\\RaptorAudioClass.csproj|solutionrelative:raptoraudioclass\\audiosystem.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    }
-  ],
+  "Documents": [],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
@@ -22,7 +9,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 8,
+          "SelectedChildIndex": -1,
           "Children": [
             {
               "$type": "Bookmark",
@@ -55,45 +42,6 @@
             {
               "$type": "Bookmark",
               "Name": "ST:1:0:{dcc4ea97-1c0c-482b-b205-e541c0df9728}"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "RaptorAudioClass.csproj",
-              "DocumentMoniker": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\RaptorAudioClass.csproj",
-              "RelativeDocumentMoniker": "RaptorAudioClass\\RaptorAudioClass.csproj",
-              "ToolTip": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\RaptorAudioClass.csproj",
-              "RelativeToolTip": "RaptorAudioClass\\RaptorAudioClass.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA0AAABOAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2026-03-19T21:52:09.954Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "NativeDecoders.cs",
-              "DocumentMoniker": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\NativeDecoders.cs",
-              "RelativeDocumentMoniker": "RaptorAudioClass\\NativeDecoders.cs",
-              "ToolTip": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\NativeDecoders.cs",
-              "RelativeToolTip": "RaptorAudioClass\\NativeDecoders.cs",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAACAAAABFAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-19T20:57:28.463Z",
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "AudioSystem.cs",
-              "DocumentMoniker": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\AudioSystem.cs",
-              "RelativeDocumentMoniker": "RaptorAudioClass\\AudioSystem.cs",
-              "ToolTip": "C:\\setups\\RaptorAudioClass\\RaptorAudioClass\\AudioSystem.cs",
-              "RelativeToolTip": "RaptorAudioClass\\AudioSystem.cs",
-              "ViewState": "AgIAAMYEAAAAAAAAAAAUwKoAAAATAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-03-19T20:53:32.577Z",
-              "EditorCaption": ""
             }
           ]
         }

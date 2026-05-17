@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RaptorAudioClass")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.9.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.9+0bd245a7911666360e35e25ec040a01dd0f99abb")]
 [assembly: System.Reflection.AssemblyProductAttribute("RaptorAudioClass")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RaptorAudioClass")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.9.0")]
