@@ -152,10 +152,11 @@ namespace RaptorAudio
                 if (audioCache.TryGetValue(template.path, out var buffer))
                     cached = buffer;
 
+                // Use template's current BaseVolume when creating clone
                 var clone = new AudioInstance(
                     template.name,
                     template.path,
-                    cached,                          // ← Important
+                    cached,
                     (int)(template.BaseVolume * 100),
                     template.looping
                 );
@@ -433,22 +434,68 @@ namespace RaptorAudio
             CorruptionControl.Filter = 0;
             CorruptionControl.Tremolo = 0;
         }
-
         public void ChangeVolume(string name, int volume)
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new ArgumentException("Name cannot be null or empty", nameof(name));
+
+            float newBaseVol = AudioScaling(volume);
 
             lock (audiolock)
             {
                 if (disposed)
                     throw new ObjectDisposedException(nameof(AudioSystem));
 
-                if (!audiolist.TryGetValue(name, out var instance))
+                if (!audiolist.TryGetValue(name, out var template))
                     throw new KeyNotFoundException($"Audio instance '{name}' not found");
-                float newVol = AudioScaling(volume);
-                instance.isample.Volume = newVol;
-                instance.BaseVolume = newVol;
+
+                // Update template
+                template.BaseVolume = newBaseVol;
+                template.isample.Volume = newBaseVol;
+
+                // Update pooled instances
+                if (pools.TryGetValue(name, out var queue))
+                {
+                    foreach (var clone in queue)
+                    {
+                        if (clone?.isample != null)
+                        {
+                            clone.BaseVolume = newBaseVol;
+                            clone.isample.Volume = newBaseVol;
+                        }
+                    }
+                }
+
+                // Update any live PlayAndForget clones
+                foreach (var instance in audiolist.Values)
+                {
+                    if (instance.name == name && instance != template)
+                    {
+                        if (instance.isample != null)
+                        {
+                            instance.BaseVolume = newBaseVol;
+                            instance.isample.Volume = newBaseVol;
+                        }
+                    }
+                }
+
+                // Re-apply all bus volumes that affect this sound
+                ReapplyBusVolumesForSound(name);
+            }
+        }
+        private void ReapplyBusVolumesForSound(string name)
+        {
+            foreach (var bus in buses.Values)
+            {
+                var span = CollectionsMarshal.AsSpan(bus.instances);
+                for (int i = 0; i < span.Length; i++)
+                {
+                    var inst = span[i];
+                    if (inst?.name == name && inst?.isample != null)
+                    {
+                        inst.isample.Volume = inst.BaseVolume * bus.Volume;
+                    }
+                }
             }
         }
         public void CreateCollectionaire(string name)
@@ -704,7 +751,7 @@ namespace RaptorAudio
                 throw new ArgumentException("Name cannot be null or empty", nameof(name));
 
             string path;
-            int volume;
+            float basevolume;
             bool looping;
             NativeBuffer? cached = null;
             List<Collectionaire> busesToJoin = null;   // ← New
@@ -718,7 +765,7 @@ namespace RaptorAudio
                     throw new KeyNotFoundException($"Audio instance '{name}' not found");
 
                 path = template.path;
-                volume = (int)(template.isample.Volume * 100);
+                basevolume = template.BaseVolume;
                 looping = template.looping;
 
                 if (audioCache.TryGetValue(path, out var nativeBuffer))
@@ -733,7 +780,8 @@ namespace RaptorAudio
             AudioInstance clone;
             try
             {
-                clone = new AudioInstance(name, path, cached, volume, looping);
+                clone = new AudioInstance(name, path, cached, (int)(basevolume * 100), looping);
+                clone.BaseVolume = basevolume;
             }
             catch (Exception ex)
             {
@@ -802,6 +850,29 @@ namespace RaptorAudio
             }
 
             return tcs.Task;
+        }
+        public void PrintVolumeInfo(string name)
+        {
+            lock (audiolock)
+            {
+                Console.WriteLine($"=== Volume Info for '{name}' ===");
+                if (audiolist.TryGetValue(name, out var template))
+                {
+                    Console.WriteLine($"Template -> Base: {template.BaseVolume:F2} | Current: {template.isample?.Volume:F2}");
+                }
+
+                if (pools.TryGetValue(name, out var queue))
+                {
+                    Console.WriteLine($"Pool has {queue.Count} ready instances");
+                }
+
+                foreach (var bus in buses.Values)
+                {
+                    int count = bus.instances.Count(inst => inst?.name == name);
+                    if (count > 0)
+                        Console.WriteLine($"Bus '{bus.Name}' (vol={bus.Volume:F2}) affects {count} instance(s) of this sound");
+                }
+            }
         }
         public void Dispose()
         {
